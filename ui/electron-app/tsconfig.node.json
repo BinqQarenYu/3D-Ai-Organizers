@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "composite": true,
+        "module": "CommonJS",
+        "moduleResolution": "Node",
+        "strict": false,
+        "skipLibCheck": true,
+        "outDir": "dist/main",
+        "rootDir": "src/main"
+    },
+    "include": [
+        "src/main"
+    ]
+}
