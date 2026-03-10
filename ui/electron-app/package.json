@@ -12,10 +12,14 @@
         "electron:dev": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on http://127.0.0.1:5173 && electron .\""
     },
     "dependencies": {
+        "@react-three/drei": "^9.122.0",
+        "@react-three/fiber": "^8.18.0",
+        "@types/three": "^0.183.1",
         "lucide-react": "^0.378.0",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
-        "react-router-dom": "^7.13.1"
+        "react-router-dom": "^7.13.1",
+        "three": "^0.183.2"
     },
     "devDependencies": {
         "@types/node": "^20.12.11",

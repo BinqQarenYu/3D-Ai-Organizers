@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AssetListItem } from '../api/types';
 import { api } from '../api/client';
 import { ExternalLink, Image as ImageIcon, Search } from 'lucide-react';
+import Stage3D from './viewer/Stage3D';
 
 interface AssetCardProps {
     asset: AssetListItem;
@@ -9,9 +10,16 @@ interface AssetCardProps {
     onClick: (assetId: string) => void;
 }
 
+const is3DModel = (ext?: string) => {
+    if (!ext) return false;
+    const lowerExt = ext.toLowerCase();
+    return lowerExt === '.glb' || lowerExt === '.gltf' || lowerExt === '.obj';
+};
+
 const AssetCard: React.FC<AssetCardProps> = ({ asset, onFindSimilar, onClick }) => {
     const [imgError, setImgError] = useState(false);
     const previewUrl = api.getPreviewUrl(asset.asset_id);
+    const has3D = is3DModel(asset.original_ext);
 
     const handleOpen = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -32,14 +40,16 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, onFindSimilar, onClick }) 
             onClick={() => onClick(asset.asset_id)}
             className="group flex flex-col pt-0 pb-3 bg-white dark:bg-slate-800 rounded-xl overflow-hidden cursor-pointer border border-gray-200 dark:border-slate-700/50 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ease-out h-64 relative"
         >
-            {/* Image Area */}
+            {/* Image/3D Area */}
             <div className="flex-1 w-full bg-slate-100 dark:bg-slate-900 overflow-hidden flex items-center justify-center relative">
-                {!imgError ? (
+                {has3D ? (
+                    <Stage3D sourceUrl={previewUrl} extension={asset.original_ext!} />
+                ) : !imgError ? (
                     <img
                         src={previewUrl}
                         alt={asset.display_name}
                         onError={() => setImgError(true)}
-                        className="w-full h-full object-contain object-bottom pt-2"
+                        className="w-full h-full object-contain object-bottom pt-2 pointer-events-none"
                     />
                 ) : (
                     <div className="flex flex-col items-center justify-center text-slate-400">
@@ -49,17 +59,17 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, onFindSimilar, onClick }) 
                 )}
 
                 {/* Hover Actions Overlay */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3 backdrop-blur-[2px]">
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3 backdrop-blur-[2px] pointer-events-none">
                     <button
                         onClick={handleOpen}
-                        className="p-2 bg-white/10 hover:bg-white text-white hover:text-slate-900 rounded-full backdrop-blur-md transition-colors"
+                        className="p-2 bg-white/10 hover:bg-white text-white hover:text-slate-900 rounded-full backdrop-blur-md transition-colors pointer-events-auto"
                         title="Open Original"
                     >
                         <ExternalLink className="h-5 w-5" />
                     </button>
                     <button
                         onClick={handleSimilar}
-                        className="p-2 bg-white/10 hover:bg-white text-white hover:text-slate-900 rounded-full backdrop-blur-md transition-colors"
+                        className="p-2 bg-white/10 hover:bg-white text-white hover:text-slate-900 rounded-full backdrop-blur-md transition-colors pointer-events-auto"
                         title="Find Similar"
                     >
                         <Search className="h-5 w-5" />
