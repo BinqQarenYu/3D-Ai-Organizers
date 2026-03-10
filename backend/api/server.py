@@ -12,6 +12,8 @@ from backend.storage.local_disk import LocalDiskProvider
 from backend.vision.vector_store import EmbeddingStore
 from backend.vision.embedder import StubEmbedder
 from backend.vision.similarity_service import SimilarityService
+from backend.watcher.watch_service import WatchService
+from backend.indexer.asset_record import load_asset_metadata
 from backend.api import schemas
 
 app = FastAPI(title="AI Asset Memory Backend", version="0.1.0")
@@ -28,6 +30,7 @@ app.add_middleware(
 storage_provider: LocalDiskProvider
 embedding_store: EmbeddingStore
 similarity_service: SimilarityService
+watch_service: WatchService
 
 @app.on_event("startup")
 async def startup_event():
@@ -44,12 +47,16 @@ async def startup_event():
     embedder = StubEmbedder()
     similarity_service = SimilarityService(embedding_store, embedder)
     
+    # Start the background background watcher
+    watch_service = WatchService(storage_provider)
+    watch_service.start(interval_seconds=15)
+    
     logger.info("Backend Services Initialized.")
 
 @app.get("/api/v1/health", response_model=schemas.HealthResponse)
 async def get_health():
     features = schemas.HealthFeatures(
-        watcher=False,
+        watcher=True,
         preview_generation=False,
         vision_embeddings=True,
         similarity_search=True,
@@ -136,56 +143,104 @@ async def find_similar(
     data = schemas.SimilarData(query=query_info, results=results)
     return schemas.SimilarResponse(data=data)
 
-# --- Stubs for Frontend Integration Testing ---
+# --- API Implementations ---
+
+def _load_all_records():
+    assets_ref = storage_provider.ref("assets")
+    records = []
+    if storage_provider.exists(assets_ref):
+        for item in storage_provider.listdir(assets_ref):
+            if item.name.endswith(".json"):
+                asset_id = item.name[:-5]
+                data = load_asset_metadata(storage_provider, asset_id)
+                if data:
+                    records.append(data)
+    # Sort descending by creation date (newest first)
+    records.sort(key=lambda x: x.get("timestamps", {}).get("created_at", ""), reverse=True)
+    return records
 
 @app.post("/api/v1/search", response_model=schemas.SearchResponse)
 async def search_assets(req: schemas.SearchRequest):
-    # Stub response matching exactly the parameters from UI limits
+    all_records = _load_all_records()
     items = []
-    # Just returning some fake elements so the frontend paginates correctly
-    for i in range(req.limit):
-        id_str = f"stub_{req.offset + i}"
+    
+    query = (req.query or "").lower().strip()
+    
+    for r in all_records:
+        ident = r.get("identity", {})
+        display_name = ident.get("display_name", "")
+        # Basic filter
+        if query and query not in display_name.lower():
+             continue
+             
         items.append(schemas.AssetListItem(
-            asset_id=id_str,
-            display_name=f"Search Result {req.query} #{req.offset + i}",
-            name_source="stub",
-            status="indexed",
-            original_ext=".fbx"
+            asset_id=r.get("asset_id", ""),
+            display_name=display_name,
+            name_source=ident.get("name_source", "unknown"),
+            status=r.get("status", {}).get("state", "indexed"),
+            original_ext=os.path.splitext(r.get("files", {}).get("original_filename", ""))[1]
         ))
     
+    total = len(items)
+    paged = items[req.offset: req.offset + req.limit]
+    
     data = schemas.AssetListData(
-        total=5000,
+        total=total,
         offset=req.offset,
         limit=req.limit,
-        items=items
+        items=paged
     )
     return schemas.SearchResponse(data=data)
 
 @app.get("/api/v1/assets", response_model=schemas.AssetListResponse)
 async def list_recent_assets():
-    # Stub response for recent assets home page
-    items = [
-        schemas.AssetListItem(
-            asset_id=f"recent_{i}",
-            display_name=f"Recent Asset {i}",
-            name_source="stub",
-            status="indexed",
-            original_ext=".rvt"
-        ) for i in range(6)
-    ]
-    data = schemas.AssetListData(total=6, offset=0, limit=12, items=items)
+    all_records = _load_all_records()
+    
+    items = []
+    # Take top 12
+    for r in all_records[:12]:
+        items.append(schemas.AssetListItem(
+            asset_id=r.get("asset_id", ""),
+            display_name=r.get("identity", {}).get("display_name", ""),
+            name_source=r.get("identity", {}).get("name_source", "unknown"),
+            status=r.get("status", {}).get("state", "indexed"),
+            original_ext=os.path.splitext(r.get("files", {}).get("original_filename", ""))[1]
+        ))
+        
+    data = schemas.AssetListData(total=len(all_records), offset=0, limit=12, items=items)
     return schemas.AssetListResponse(data=data)
 
 @app.get("/api/v1/assets/{asset_id}", response_model=schemas.AssetDetailsResponse)
 async def get_asset_details(asset_id: str):
-    # Stub response
+    record = load_asset_metadata(storage_provider, asset_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Asset not found")
+        
     storage = schemas.StorageInfo(provider="local_disk", root=settings.assets_root)
-    paths = schemas.PathsInfo(original_ref=schemas.StorageRefSchema(provider="local",root_id="1",key="fake"))
-    ident = schemas.IdentityInfo(display_name=f"Detail View {asset_id}", name_source="stub", confidence=1.0)
-    classif = schemas.ClassificationInfo(category="Furniture", tags=["Wood", "Interior"], confidence=0.8)
-    vis = schemas.VisionInfo(embedding_dim=768, engine="stub", embedding_created="now")
-    stat = schemas.StatusInfo(state="indexed", needs_review=False)
-    times = schemas.AssetTimestamps()
+    
+    original_file = record.get("files", {}).get("original_filename", "")
+    paths = schemas.PathsInfo(
+        original_ref=schemas.StorageRefSchema(
+            provider="local",
+            root_id=storage_provider.root_id(),
+            key=original_file
+        )
+    )
+    
+    ident_data = record.get("identity", {})
+    ident = schemas.IdentityInfo(
+        display_name=ident_data.get("display_name", ""),
+        name_source=ident_data.get("name_source", ""),
+        confidence=ident_data.get("confidence", 1.0)
+    )
+    classif = schemas.ClassificationInfo(category="Uncategorized", tags=[], confidence=0.0)
+    vis = schemas.VisionInfo(embedding_dim=0, engine="none", embedding_created="")
+    
+    stat_data = record.get("status", {})
+    stat = schemas.StatusInfo(state=stat_data.get("state", "indexed"), needs_review=stat_data.get("needs_review", False))
+    
+    ts_data = record.get("timestamps", {})
+    times = schemas.AssetTimestamps(created_at=ts_data.get("created_at"), last_updated=ts_data.get("last_updated"))
 
     data = schemas.AssetDetailsData(
         asset_id=asset_id, storage=storage, paths=paths,
@@ -195,10 +250,45 @@ async def get_asset_details(asset_id: str):
 
 @app.post("/api/v1/files/open-original")
 async def open_original(req: schemas.OpenOriginalRequest):
-    # Stub returning success
-    return schemas.OpenOriginalResponse(data=schemas.OpenOriginalData(opened=True))
+    record = load_asset_metadata(storage_provider, req.asset_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    orig_rel_path = record.get("files", {}).get("original_filename")
+    if not orig_rel_path:
+        raise HTTPException(status_code=404, detail="No original file path in metadata")
+        
+    full_path = storage_provider.to_local_path(storage_provider.ref(orig_rel_path))
+    
+    if os.path.exists(full_path):
+        import subprocess
+        try:
+             # On Windows, os.startfile is best. Using subprocess for general safety.
+             if os.name == 'nt':
+                 os.startfile(full_path)
+             else:
+                 # Fallback for other systems (though user is on Windows)
+                 opener = "open" if os.uname().sysname == "Darwin" else "xdg-open"
+                 subprocess.call([opener, full_path])
+             return schemas.OpenOriginalResponse(data=schemas.OpenOriginalData(opened=True))
+        except Exception as e:
+             logger.error(f"Failed to open file: {e}")
+             raise HTTPException(status_code=500, detail=str(e))
+    else:
+        raise HTTPException(status_code=404, detail=f"File not found on disk: {full_path}")
 
 @app.get("/api/v1/files/preview/{asset_id}")
 async def get_preview_image(asset_id: str):
+    record = load_asset_metadata(storage_provider, asset_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Asset not found")
+        
+    orig_rel_path = record.get("files", {}).get("original_filename")
+    if orig_rel_path:
+        full_path = storage_provider.to_local_path(storage_provider.ref(orig_rel_path))
+        if os.path.exists(full_path):
+            from fastapi.responses import FileResponse
+            return FileResponse(full_path)
+            
     # Instead of sending a real file, just 404 or send transparent 1x1 for now so frontend handles onError
     raise HTTPException(status_code=404, detail="Preview not generated yet")

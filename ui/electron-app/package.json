@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "description": "AI Asset Memory Frontend",
     "main": "dist/main/main.js",
+    "type": "module",
     "scripts": {
         "dev": "vite",
         "build": "vite build && tsc -p tsconfig.node.json",

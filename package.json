@@ -1,0 +1,8 @@
+{
+    "name": "ai-asset-memory-workspace",
+    "version": "1.0.0",
+    "description": "Root workspace script manager for running AI Asset Memory",
+    "scripts": {
+        "start": "node dev.js"
+    }
+}

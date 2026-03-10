@@ -1,0 +1,22 @@
+{
+  "asset_id": "55b10d7b316b4369b0fea9195a41dc26",
+  "identity": {
+    "display_name": "originals/test_cube",
+    "name_source": "filename",
+    "confidence": 1.0
+  },
+  "files": {
+    "original_filename": "originals/test_cube.obj",
+    "preview_exists": false,
+    "size_bytes": 152
+  },
+  "status": {
+    "state": "raw",
+    "needs_review": false,
+    "issues": []
+  },
+  "timestamps": {
+    "created_at": "2026-02-25T15:52:34.950602",
+    "last_updated": "2026-02-25T15:52:34.950602"
+  }
+}
