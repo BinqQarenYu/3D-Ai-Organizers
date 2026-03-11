@@ -92,10 +92,16 @@ class ClassificationInfo(BaseModel):
     tags: List[str] = Field(default_factory=list)
     confidence: float
 
+class Meta3D(BaseModel):
+    bounding_box: Optional[List[float]] = None
+    vertex_count: Optional[int] = None
+    material_count: Optional[int] = None
+
 class VisionInfo(BaseModel):
     embedding_dim: Optional[int] = None
     engine: Optional[str] = None
     embedding_created: Optional[str] = None
+    metadata_3d: Optional[Meta3D] = None
 
 class StatusInfo(BaseModel):
     state: str
@@ -155,6 +161,17 @@ class SimilarData(BaseModel):
 
 class SimilarResponse(ApiResponse):
     data: Optional[SimilarData] = None
+
+# Asset Creation
+class AssetCreateRequest(BaseModel):
+    reference_url: str
+    name: Optional[str] = None
+
+class AssetCreateData(BaseModel):
+    asset_id: str
+
+class AssetCreateResponse(ApiResponse):
+    data: Optional[AssetCreateData] = None
 
 # File Operations
 class OpenOriginalRequest(BaseModel):

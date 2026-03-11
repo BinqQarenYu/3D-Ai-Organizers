@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, UploadFile, Form, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from typing import Optional
 
 from backend.config.settings import settings
@@ -13,10 +14,16 @@ from backend.vision.vector_store import EmbeddingStore
 from backend.vision.embedder import StubEmbedder
 from backend.vision.similarity_service import SimilarityService
 from backend.watcher.watch_service import WatchService
-from backend.indexer.asset_record import load_asset_metadata
+import uuid
+from backend.indexer.asset_record import load_asset_metadata, create_initial_record, save_asset_metadata
 from backend.api import schemas
+from backend.api.extract_3d import extract_3d_metadata
+from backend.api.proxy import router as proxy_router
 
 app = FastAPI(title="AI Asset Memory Backend", version="0.1.0")
+
+# Include Proxy router
+app.include_router(proxy_router)
 
 # Allow all CORS for desktop Electron app
 app.add_middleware(
@@ -47,6 +54,11 @@ async def startup_event():
     embedder = StubEmbedder()
     similarity_service = SimilarityService(embedding_store, embedder)
     
+    # Mount the /uploads route for static file serving
+    uploads_dir = Path(settings.assets_root) / "originals"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
+
     # Start the background background watcher
     watch_service = WatchService(storage_provider)
     watch_service.start(interval_seconds=15)
@@ -159,6 +171,31 @@ def _load_all_records():
     records.sort(key=lambda x: x.get("timestamps", {}).get("created_at", ""), reverse=True)
     return records
 
+@app.post("/api/v1/assets", response_model=schemas.AssetCreateResponse)
+async def create_asset(req: schemas.AssetCreateRequest):
+    asset_id = str(uuid.uuid4()).replace("-", "")
+
+    # Generate a sensible name if none provided
+    name = req.name
+    if not name:
+        name = req.reference_url.split("/")[-1]
+
+    record = create_initial_record(asset_id, name)
+
+    # Store reference url instead of local original file
+    record["files"]["original_filename"] = req.reference_url
+
+    # Extract 3D Metadata if it's referenced
+    meta3d = extract_3d_metadata(req.reference_url)
+    if meta3d:
+        if "vision" not in record:
+            record["vision"] = {}
+        record["vision"]["metadata_3d"] = meta3d
+
+    save_asset_metadata(storage_provider, asset_id, record)
+
+    return schemas.AssetCreateResponse(data=schemas.AssetCreateData(asset_id=asset_id))
+
 @app.post("/api/v1/search", response_model=schemas.SearchResponse)
 async def search_assets(req: schemas.SearchRequest):
     all_records = _load_all_records()
@@ -234,7 +271,13 @@ async def get_asset_details(asset_id: str):
         confidence=ident_data.get("confidence", 1.0)
     )
     classif = schemas.ClassificationInfo(category="Uncategorized", tags=[], confidence=0.0)
-    vis = schemas.VisionInfo(embedding_dim=0, engine="none", embedding_created="")
+    vis_data = record.get("vision", {})
+    vis = schemas.VisionInfo(
+        embedding_dim=vis_data.get("embedding_dim", 0),
+        engine=vis_data.get("engine", "none"),
+        embedding_created=vis_data.get("embedding_created", ""),
+        metadata_3d=vis_data.get("metadata_3d")
+    )
     
     stat_data = record.get("status", {})
     stat = schemas.StatusInfo(state=stat_data.get("state", "indexed"), needs_review=stat_data.get("needs_review", False))
