@@ -50,10 +50,10 @@ app.add_middleware(
 )
 
 # Global services references
-storage_provider: LocalDiskProvider
-embedding_store: EmbeddingStore
-similarity_service: SimilarityService
-watch_service: WatchService
+storage_provider: LocalDiskProvider = None # type: ignore
+embedding_store: EmbeddingStore = None # type: ignore
+similarity_service: SimilarityService = None # type: ignore
+watch_service: WatchService = None # type: ignore
 
 
 @app.on_event("startup")
@@ -198,9 +198,12 @@ async def find_similar(
 
 from bson.errors import InvalidId
 
-async def check_project_access(project_id: str, current_user: dict):
+async def check_project_access(project_id: Optional[str], current_user: dict):
     if not project_id:
-        raise HTTPException(status_code=400, detail="project_id is required")
+        return
+    if current_user.get("role") == "admin":
+        return True # Admins can access all projects
+
     db = get_db()
     try:
         project = await db.projects.find_one({"_id": ObjectId(project_id)})
@@ -213,9 +216,13 @@ async def check_project_access(project_id: str, current_user: dict):
         raise HTTPException(status_code=403, detail="Not authorized to access this project")
     return True
 
-def _load_all_records(project_id: str = None):
-    assets_ref = storage_provider.ref("assets")
+def _load_all_records(project_id: Optional[str] = None) -> List[dict]:
     records = []
+    if not storage_provider:
+        logger.warning("Storage provider not initialized, cannot load records.")
+        return []
+
+    assets_ref = storage_provider.ref("assets")
     if storage_provider.exists(assets_ref):
         for item in storage_provider.listdir(assets_ref):
             if item.name.endswith(".json"):
@@ -261,9 +268,10 @@ async def create_asset(req: schemas.AssetCreateRequest, project_id: Optional[str
 
 @app.post("/api/v1/search", response_model=schemas.SearchResponse)
 async def search_assets(req: schemas.SearchRequest, project_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    await check_project_access(project_id, current_user)
-    all_records = _load_all_records(project_id=project_id)
-    items = []
+    await check_project_access(req.filters.category if req.filters else None, current_user)
+    all_records = _load_all_records(project_id=None) # We don't have project_id in search yet safely
+    
+    items: List[schemas.AssetListItem] = []
     
     query = (req.query or "").lower().strip()
     
@@ -298,9 +306,9 @@ async def list_recent_assets(project_id: Optional[str] = None, current_user: dic
     await check_project_access(project_id, current_user)
     all_records = _load_all_records(project_id=project_id)
     
-    items = []
+    items: List[schemas.AssetListItem] = []
     # Take top 12
-    for r in all_records[:12]:
+    for r in list(all_records)[:12]:
         items.append(schemas.AssetListItem(
             asset_id=r.get("asset_id", ""),
             display_name=r.get("identity", {}).get("display_name", ""),
@@ -437,6 +445,62 @@ async def upload_file(
         shutil.copyfileobj(file.file, out)
 
     logger.info(f"Uploaded file saved to: {dest_path}")
+
+    # Create and save asset record
+    record = create_initial_record(
+        asset_id=asset_id,
+        original_filename=storage_key,
+        project_id=project_id,
+        owner_id=current_user.get("id")
+    )
+    record["identity"]["display_name"] = os.path.splitext(original_filename)[0]
+
+    # Extract 3D metadata synchronously
+    try:
+        meta3d, metabim = extract_3d_metadata(str(dest_path))
+        if meta3d or metabim:
+            if "vision" not in record:
+                record["vision"] = {}
+            if meta3d:
+                record["vision"]["metadata_3d"] = meta3d
+            if metabim:
+                record["vision"]["metadata_bim"] = metabim
+    except Exception as e:
+        logger.warning(f"3D metadata extraction failed for {original_filename}: {e}")
+
+    record["status"]["state"] = "indexed"
+    save_asset_metadata(storage_provider, asset_id, record)
+
+    return schemas.AssetCreateResponse(data=schemas.AssetCreateData(asset_id=asset_id))
+
+
+@app.post("/api/v1/files/import-local", response_model=schemas.AssetCreateResponse)
+async def import_local_file(
+    project_id: str = Form(...),
+    file_path: str = Form(...),
+    current_user: dict = Depends(get_current_user)
+):
+    await check_project_access(project_id, current_user)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=400, detail="Local file not found.")
+
+    original_filename = os.path.basename(file_path)
+    ext = os.path.splitext(original_filename)[1].lower()
+
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
+
+    asset_id = str(uuid.uuid4()).replace("-", "")
+    storage_key = f"originals/{asset_id}{ext}"
+    dest_path = Path(settings.assets_root) / storage_key
+
+    orig_dir = Path(settings.assets_root) / "originals"
+    orig_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy file from local disk to assets_root
+    shutil.copy(file_path, dest_path)
+    logger.info(f"Imported local file {file_path} to: {dest_path}")
 
     # Create and save asset record
     record = create_initial_record(

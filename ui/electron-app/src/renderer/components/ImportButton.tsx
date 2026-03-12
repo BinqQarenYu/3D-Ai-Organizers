@@ -46,19 +46,10 @@ const ImportButton: React.FC<ImportButtonProps> = ({ projectId, onImported }) =>
                     return;
                 }
 
-                // Read the file via main process IPC — fetch('file://') is blocked by Chromium sandbox
                 setStatus('uploading');
-                const readResult = await electronAPI.readFile(filePath);
-                if (!readResult.ok) {
-                    throw new Error(`Could not read file: ${readResult.error}`);
-                }
+                // Use the local file import route on the backend instead of passing huge files over IPC
+                const result = await api.importLocalFile(filePath, projectId);
 
-                // Reconstruct a File from the byte array returned over IPC
-                const bytes = new Uint8Array(readResult.data);
-                const fileName = filePath.split(/[\\/]/).pop() || 'model.obj';
-                const file = new File([bytes], fileName);
-
-                const result = await api.uploadFile(file, projectId);
                 setNewAssetId(result.asset_id);
                 setStatus('success');
                 onImported?.(result.asset_id);

@@ -76,7 +76,7 @@ function createWindow() {
     ipcMain.handle('read-file', async (_event, filePath: string) => {
         try {
             const buffer = fs.readFileSync(filePath);
-            return { ok: true, data: Array.from(buffer) };
+            return { ok: true, data: buffer };
         } catch (e: any) {
             return { ok: false, error: e.message };
         }

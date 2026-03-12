@@ -125,6 +125,29 @@ class ApiClient {
         const data = await res.json();
         return data.data;
     }
+
+    async importLocalFile(filePath: string, projectId: string): Promise<{ asset_id: string }> {
+        const token = localStorage.getItem('token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const formData = new FormData();
+        formData.append('project_id', projectId);
+        formData.append('file_path', filePath);
+
+        const res = await fetch(`${API_BASE_URL}/files/import-local`, {
+            method: 'POST',
+            headers,
+            body: formData
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err?.detail || `Import failed: ${res.statusText}`);
+        }
+        const data = await res.json();
+        return data.data;
+    }
 }
 
 export const api = new ApiClient();
