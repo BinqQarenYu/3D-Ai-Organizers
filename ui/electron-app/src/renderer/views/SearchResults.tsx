@@ -6,12 +6,16 @@ import AssetDetailPanel from '../components/AssetDetailPanel';
 import { api } from '../api/client';
 import { AssetListItem } from '../api/types';
 import { statusBus } from '../components/StatusBar';
+import { useProject } from '../contexts/ProjectContext';
+
 
 const PAGE_SIZE = 50;
 
 const SearchResults: React.FC = () => {
     const [searchParams] = useSearchParams();
     const query = searchParams.get('q') || '';
+    const { selectedProject } = useProject();
+
     const navigate = useNavigate();
 
     const [assets, setAssets] = useState<AssetListItem[]>([]);
@@ -41,7 +45,7 @@ const SearchResults: React.FC = () => {
         setOffset(0);
         setHasMore(true);
         setTotal(0);
-    }, [query]);
+    }, [query, selectedProject?.id]);
 
     // Append new items
     useEffect(() => {
@@ -76,7 +80,7 @@ const SearchResults: React.FC = () => {
     };
 
     const handleFindSimilar = (assetId: string) => {
-        navigate(`/similar/${assetId}`);
+        navigate(`/similar/${assetId}?projectId=${selectedProject?.id || ''}`);
     };
 
     return (

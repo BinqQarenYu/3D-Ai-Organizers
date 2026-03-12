@@ -6,17 +6,25 @@ import { api } from '../api/client';
 import AssetCard from '../components/AssetCard';
 import AssetDetailPanel from '../components/AssetDetailPanel';
 import { statusBus } from '../components/StatusBar';
+import { useProject } from '../contexts/ProjectContext';
+
 
 const Home: React.FC = () => {
     const navigate = useNavigate();
     const [recentAssets, setRecentAssets] = useState<AssetListItem[]>([]);
     const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
+    const { selectedProject } = useProject();
+
 
     useEffect(() => {
         // Load recent assets on mount
         const loadRecent = async () => {
+            if (!selectedProject?.id) {
+                setRecentAssets([]);
+                return;
+            }
             try {
-                const assets = await api.getRecentAssets();
+                const assets = await api.getRecentAssets(selectedProject?.id);
                 setRecentAssets(assets);
             } catch (e) {
                 console.error(e);
@@ -24,14 +32,14 @@ const Home: React.FC = () => {
             }
         };
         loadRecent();
-    }, []);
+    }, [selectedProject]);
 
     const handleSearch = (query: string) => {
         navigate(`/search?q=${encodeURIComponent(query)}`);
     };
 
     const handleFindSimilar = (assetId: string) => {
-        navigate(`/similar/${assetId}`);
+        navigate(`/similar/${assetId}?projectId=${selectedProject?.id || ''}`);
     };
 
     return (
