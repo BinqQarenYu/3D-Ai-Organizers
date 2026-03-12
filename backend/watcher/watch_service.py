@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 SUPPORTED_EXTENSIONS = {
     ".fbx", ".obj", ".blend", ".gltf", ".glb", 
     ".png", ".jpg", ".jpeg", ".skp", ".max", 
-    ".rvt", ".rft", ".stl", ".ply", ".dae", 
+    ".rvt", ".rft", ".rfa", ".dwg", ".stl", ".ply", ".dae",
     ".3mf", ".3dm", ".ifc"
 }
 

@@ -18,6 +18,22 @@ import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader.js';
 import { Group, Mesh, MeshStandardMaterial, DoubleSide } from 'three';
 
+class ErrorBoundary extends React.Component<{ fallback: React.ReactNode, children: React.ReactNode }, { hasError: boolean }> {
+    constructor(props: { fallback: React.ReactNode, children: React.ReactNode }) {
+        super(props);
+        this.state = { hasError: false };
+    }
+
+    static getDerivedStateFromError() {
+        return { hasError: true };
+    }
+
+    render() {
+        if (this.state.hasError) return this.props.fallback;
+        return this.props.children;
+    }
+}
+
 interface Stage3DProps {
     sourceUrl: string;
     extension: string;
@@ -118,7 +134,17 @@ const Stage3D: React.FC<Stage3DProps> = ({ sourceUrl, extension }) => {
                     
                     <Center>
                         <Float speed={1.5} rotationIntensity={0.5} floatIntensity={0.5}>
-                            <ModelLoader url={sourceUrl} ext={extension} />
+                            <ErrorBoundary fallback={
+                                <Html center>
+                                    <div className="flex flex-col items-center justify-center p-4 bg-red-900/80 backdrop-blur-md rounded-xl text-white shadow-xl border border-red-500/30 text-center min-w-[200px]">
+                                        <AlertTriangle size={24} className="text-red-400 mb-2" />
+                                        <span className="text-xs font-bold">Failed to render {extension.toUpperCase()}</span>
+                                        <p className="text-[10px] text-red-200 mt-1">Unsupported version or damaged file</p>
+                                    </div>
+                                </Html>
+                            }>
+                                <ModelLoader url={sourceUrl} ext={extension} />
+                            </ErrorBoundary>
                         </Float>
                     </Center>
 

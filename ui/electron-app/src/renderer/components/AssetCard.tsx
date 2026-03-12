@@ -4,6 +4,12 @@ import { api } from '../api/client';
 import { ExternalLink, Image as ImageIcon, Search } from 'lucide-react';
 import Stage3D from './viewer/Stage3D';
 
+const VIEWABLE_3D = new Set([
+    '.obj', '.glb', '.gltf', '.fbx', '.stl', 
+    '.ply', '.dae', '.3mf', '.3dm', 
+    '.skp', '.rvt', '.rft', '.max', '.ifc', '.blend'
+]);
+
 interface AssetCardProps {
     asset: AssetListItem;
     onFindSimilar: (assetId: string) => void;
@@ -12,8 +18,7 @@ interface AssetCardProps {
 
 const is3DModel = (ext?: string) => {
     if (!ext) return false;
-    const lowerExt = ext.toLowerCase();
-    return lowerExt === '.glb' || lowerExt === '.gltf' || lowerExt === '.obj';
+    return VIEWABLE_3D.has(ext.toLowerCase());
 };
 
 const API_BASE = 'http://127.0.0.1:17831';

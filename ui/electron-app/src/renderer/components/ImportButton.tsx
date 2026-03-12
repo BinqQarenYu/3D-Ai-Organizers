@@ -15,7 +15,7 @@ const ImportButton: React.FC<ImportButtonProps> = ({ projectId, onImported }) =>
     const [newAssetId, setNewAssetId] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const ACCEPTED = '.obj,.glb,.gltf,.fbx,.blend,.skp,.max,.rvt,.rft,.stl,.ply,.dae,.3mf,.3dm,.ifc';
+    const ACCEPTED = '.obj,.glb,.gltf,.fbx,.blend,.skp,.max,.rvt,.rft,.rfa,.dwg,.stl,.ply,.dae,.3mf,.3dm,.ifc';
 
     // Try Electron native dialog first, fallback to browser file input
     const handleImport = async () => {
@@ -34,8 +34,8 @@ const ImportButton: React.FC<ImportButtonProps> = ({ projectId, onImported }) =>
                 const filePath: string | null = await electronAPI.selectFile({
                     title: 'Import 3D Asset',
                     filters: [
-                        { name: '3D Assets', extensions: ['obj', 'glb', 'gltf', 'fbx', 'blend', 'skp', 'max', 'rvt', 'rft', 'stl', 'ply', 'dae', '3mf', '3dm', 'ifc'] },
-                        { name: 'SketchUp / Revit / 3ds Max', extensions: ['skp', 'rvt', 'rft', 'max'] },
+                        { name: '3D Assets', extensions: ['obj', 'glb', 'gltf', 'fbx', 'blend', 'skp', 'max', 'rvt', 'rft', 'rfa', 'dwg', 'stl', 'ply', 'dae', '3mf', '3dm', 'ifc'] },
+                        { name: 'SketchUp / Revit / CAD', extensions: ['skp', 'rvt', 'rft', 'rfa', 'dwg', 'max'] },
                         { name: 'Standard 3D', extensions: ['obj', 'fbx', 'stl', 'ply', 'dae'] },
                         { name: 'GLTF / GLB', extensions: ['gltf', 'glb'] },
                     ],

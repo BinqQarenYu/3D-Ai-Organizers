@@ -432,7 +432,7 @@ async def get_preview_image(asset_id: str):
 
 ALLOWED_UPLOAD_EXTENSIONS = {
     ".obj", ".glb", ".gltf", ".fbx", ".blend", 
-    ".skp", ".max", ".rvt", ".rft", ".stl", ".ply", 
+    ".skp", ".max", ".rvt", ".rft", ".rfa", ".dwg", ".stl", ".ply", 
     ".dae", ".3mf", ".3dm", ".ifc",
     ".png", ".jpg", ".jpeg"
 }
