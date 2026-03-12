@@ -97,11 +97,17 @@ class Meta3D(BaseModel):
     vertex_count: Optional[int] = None
     material_count: Optional[int] = None
 
+class BimMetadata(BaseModel):
+    element_counts: Optional[Dict[str, int]] = None
+    parameters: Optional[Dict[str, Any]] = None
+    format_specific_data: Optional[Dict[str, Any]] = None
+
 class VisionInfo(BaseModel):
     embedding_dim: Optional[int] = None
     engine: Optional[str] = None
     embedding_created: Optional[str] = None
     metadata_3d: Optional[Meta3D] = None
+    metadata_bim: Optional[BimMetadata] = None
 
 class StatusInfo(BaseModel):
     state: str

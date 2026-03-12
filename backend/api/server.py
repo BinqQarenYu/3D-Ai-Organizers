@@ -186,11 +186,14 @@ async def create_asset(req: schemas.AssetCreateRequest):
     record["files"]["original_filename"] = req.reference_url
 
     # Extract 3D Metadata if it's referenced
-    meta3d = extract_3d_metadata(req.reference_url)
-    if meta3d:
+    meta3d, metabim = extract_3d_metadata(req.reference_url)
+    if meta3d or metabim:
         if "vision" not in record:
             record["vision"] = {}
-        record["vision"]["metadata_3d"] = meta3d
+        if meta3d:
+            record["vision"]["metadata_3d"] = meta3d
+        if metabim:
+            record["vision"]["metadata_bim"] = metabim
 
     save_asset_metadata(storage_provider, asset_id, record)
 
@@ -276,7 +279,8 @@ async def get_asset_details(asset_id: str):
         embedding_dim=vis_data.get("embedding_dim", 0),
         engine=vis_data.get("engine", "none"),
         embedding_created=vis_data.get("embedding_created", ""),
-        metadata_3d=vis_data.get("metadata_3d")
+        metadata_3d=vis_data.get("metadata_3d"),
+        metadata_bim=vis_data.get("metadata_bim")
     )
     
     stat_data = record.get("status", {})
