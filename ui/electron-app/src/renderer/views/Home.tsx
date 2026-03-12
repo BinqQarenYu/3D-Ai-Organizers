@@ -35,9 +35,10 @@ const Home: React.FC = () => {
         loadRecent();
     }, [loadRecent]);
 
-    const handleImported = (_assetId: string) => {
-        // Refresh asset list when a new file is imported
+    const handleImported = (assetId: string) => {
+        // Refresh asset list and open the new asset immediately
         loadRecent();
+        setSelectedAsset(assetId);
         statusBus.emit('Asset imported successfully!');
     };
 

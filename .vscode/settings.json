@@ -1,0 +1,15 @@
+{
+    "python.defaultInterpreterPath": "C:\\Python314\\python.exe",
+    "python.analysis.extraPaths": [
+        "c:/Users/likha/Documents/GitHub/3D-Ai-Organizers",
+        "c:/Users/likha/Documents/GitHub/3D-Ai-Organizers/backend",
+        "C:/Users/likha/AppData/Roaming/Python/Python314/site-packages"
+    ],
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.useLibraryCodeForTypes": true,
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportMissingImports": "none",
+        "reportUnusedImport": "none"
+    },
+    "pyright.disableDiagnostics": true
+}

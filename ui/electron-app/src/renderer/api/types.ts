@@ -24,5 +24,7 @@ export interface AssetDetail extends AssetListItem {
     file_size?: number;
     created_at?: string;
     updated_at?: string;
+    vertex_count?: number;
+    material_count?: number;
     // Other fields as defined by the backend...
 }

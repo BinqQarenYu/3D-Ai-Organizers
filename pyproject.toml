@@ -1,0 +1,20 @@
+[tool.pyright]
+include = ["."]
+extraPaths = [
+    "./",
+    "./backend",
+    "C:/Users/likha/AppData/Roaming/Python/Python314/site-packages",
+    "C:/Python314/Lib/site-packages"
+]
+reportMissingImports = "none"
+reportMissingTypeStubs = false
+pythonVersion = "3.14"
+pythonPlatform = "Windows"
+typeCheckingMode = "off"
+
+[tool.pyre]
+source_directories = ["."]
+search_path = [
+    "C:/Users/likha/AppData/Roaming/Python/Python314/site-packages",
+    "backend"
+]

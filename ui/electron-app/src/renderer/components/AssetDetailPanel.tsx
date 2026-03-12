@@ -184,8 +184,9 @@ const AssetDetailPanel: React.FC<AssetDetailPanelProps> = ({ assetId, onClose, o
                                     <Row label="Format" value={<span className="uppercase font-medium">{ext?.replace('.', '') || 'Unknown'}</span>} />
                                     <Row label="Status" value={<span className="capitalize">{asset.status?.replace('_', ' ')}</span>} />
                                     {asset.category && <Row label="Category" value={asset.category} />}
-                                    {(asset as any).vertex_count && <Row label="Vertices" value={(asset as any).vertex_count.toLocaleString()} />}
-                                    {(asset as any).created_at && <Row label="Imported" value={new Date((asset as any).created_at).toLocaleDateString()} />}
+                                    {asset.vertex_count && <Row label="Vertices" value={asset.vertex_count.toLocaleString()} />}
+                                    {asset.material_count && <Row label="Materials" value={asset.material_count.toLocaleString()} />}
+                                    {asset.created_at && <Row label="Imported" value={new Date(asset.created_at).toLocaleDateString()} />}
                                 </div>
 
                                 {asset.tags && asset.tags.length > 0 && (
