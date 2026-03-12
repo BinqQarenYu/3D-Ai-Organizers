@@ -51,7 +51,24 @@ class ApiClient {
 
     async getAssetDetails(assetId: string): Promise<any> {
         const res = await this.request<any>(`/assets/${assetId}`);
-        return res.data;
+        const d = res.data;
+        if (!d) return null;
+
+        // Derive original_ext from the stored key (e.g. "originals/<assetId>.obj")
+        const key: string = d.paths?.original_ref?.key || '';
+        const originalExt = key ? '.' + key.split('.').pop() : '';
+
+        return {
+            ...d,
+            asset_id: d.asset_id,
+            display_name: d.identity?.display_name || '',
+            status: d.status?.state || 'indexed',
+            original_ext: originalExt,
+            category: d.classification?.category,
+            tags: d.classification?.tags || [],
+            vertex_count: d.vision?.metadata_3d?.vertex_count,
+            created_at: d.timestamps?.created_at,
+        };
     }
 
     async openOriginal(assetId: string): Promise<void> {

@@ -16,10 +16,15 @@ const is3DModel = (ext?: string) => {
     return lowerExt === '.glb' || lowerExt === '.gltf' || lowerExt === '.obj';
 };
 
+const API_BASE = 'http://127.0.0.1:17831';
+
 const AssetCard: React.FC<AssetCardProps> = ({ asset, onFindSimilar, onClick }) => {
     const [imgError, setImgError] = useState(false);
-    const previewUrl = api.getPreviewUrl(asset.asset_id);
     const has3D = is3DModel(asset.original_ext);
+    // 3D files are served from the /uploads/ static mount (not the preview endpoint)
+    const previewUrl = has3D
+        ? `${API_BASE}/uploads/${asset.asset_id}${asset.original_ext}`
+        : api.getPreviewUrl(asset.asset_id);
 
     const handleOpen = async (e: React.MouseEvent) => {
         e.stopPropagation();

@@ -71,6 +71,17 @@ function createWindow() {
         return result.filePaths[0];
     });
 
+    // Read a local file in the main process and return bytes to renderer
+    // (renderer cannot use fetch('file://') due to Chromium sandbox)
+    ipcMain.handle('read-file', async (_event, filePath: string) => {
+        try {
+            const buffer = fs.readFileSync(filePath);
+            return { ok: true, data: Array.from(buffer) };
+        } catch (e: any) {
+            return { ok: false, error: e.message };
+        }
+    });
+
     if (isDev) {
         win.loadURL('http://127.0.0.1:5173');
         // win.webContents.openDevTools({ mode: 'detach' });
