@@ -27,6 +27,7 @@ from backend.api.auth import get_current_user # type: ignore
 from backend.api.database import init_db, get_db # type: ignore
 from backend.api.routes import auth, projects # type: ignore
 from backend.api.extract_3d import extract_3d_metadata # type: ignore
+from backend.api.thumbnail import generate_thumbnail # type: ignore
 from backend.api.proxy import router as proxy_router # type: ignore
 
 app = FastAPI(title="AI Asset Memory Backend", version="0.1.0")
@@ -418,6 +419,12 @@ async def get_preview_image(asset_id: str):
     if not record:
         raise HTTPException(status_code=404, detail="Asset not found")
         
+    # 1. Check if a high-quality generated thumbnail exists
+    thumb_path = cast(LocalDiskProvider, storage_provider).to_local_path(cast(LocalDiskProvider, storage_provider).ref(f"thumbnails/{asset_id}.png"))
+    if os.path.exists(thumb_path):
+        return FileResponse(thumb_path)
+        
+    # 2. Fallback to original file (if it's an image, frontend will just render it)
     orig_rel_path = record.get("files", {}).get("original_filename")
     if orig_rel_path:
         full_path = cast(LocalDiskProvider, storage_provider).to_local_path(cast(LocalDiskProvider, storage_provider).ref(orig_rel_path))
@@ -488,6 +495,10 @@ async def upload_file(
     except Exception as e:
         logger.warning(f"3D metadata extraction failed for {original_filename}: {e}")
 
+    # Generate thumbnail
+    thumb_dest = os.path.join(settings.assets_root, "thumbnails", f"{asset_id}.png")
+    generate_thumbnail(str(dest_path), thumb_dest)
+
     record["status"]["state"] = "indexed"
     save_asset_metadata(storage_provider, asset_id, record)
 
@@ -543,6 +554,10 @@ async def import_local_file(
                 record["vision"]["metadata_bim"] = metabim
     except Exception as e:
         logger.warning(f"3D metadata extraction failed for {original_filename}: {e}")
+
+    # Generate thumbnail
+    thumb_dest = os.path.join(settings.assets_root, "thumbnails", f"{asset_id}.png")
+    generate_thumbnail(str(dest_path), thumb_dest)
 
     record["status"]["state"] = "indexed"
     save_asset_metadata(storage_provider, asset_id, record)
