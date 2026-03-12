@@ -1,6 +1,6 @@
-import { contextBridge } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 
-// Expose safe APIs if needed
+// Expose safe APIs to renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
-    // Example IPC methods
+    selectFile: (options?: Electron.OpenDialogOptions) => ipcRenderer.invoke('select-file', options),
 });

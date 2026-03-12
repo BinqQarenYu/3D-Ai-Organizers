@@ -85,6 +85,29 @@ class ApiClient {
         const data = await res.json();
         return data.data?.results || [];
     }
+
+    async uploadFile(file: File, projectId: string): Promise<{ asset_id: string }> {
+        const token = localStorage.getItem('token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const formData = new FormData();
+        formData.append('project_id', projectId);
+        formData.append('file', file);
+
+        const res = await fetch(`${API_BASE_URL}/files/upload`, {
+            method: 'POST',
+            headers,
+            body: formData
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err?.detail || `Upload failed: ${res.statusText}`);
+        }
+        const data = await res.json();
+        return data.data;
+    }
 }
 
 export const api = new ApiClient();

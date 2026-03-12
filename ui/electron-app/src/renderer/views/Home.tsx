@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SearchBar from '../components/SearchBar';
 import { AssetListItem } from '../api/types';
@@ -7,6 +7,7 @@ import AssetCard from '../components/AssetCard';
 import AssetDetailPanel from '../components/AssetDetailPanel';
 import { statusBus } from '../components/StatusBar';
 import { useProject } from '../contexts/ProjectContext';
+import ImportButton from '../components/ImportButton';
 
 
 const Home: React.FC = () => {
@@ -16,23 +17,29 @@ const Home: React.FC = () => {
     const { selectedProject } = useProject();
 
 
-    useEffect(() => {
-        // Load recent assets on mount
-        const loadRecent = async () => {
-            if (!selectedProject?.id) {
-                setRecentAssets([]);
-                return;
-            }
-            try {
-                const assets = await api.getRecentAssets(selectedProject?.id);
-                setRecentAssets(assets);
-            } catch (e) {
-                console.error(e);
-                statusBus.emit('Failed to connect to backend for recent assets.');
-            }
-        };
-        loadRecent();
+    const loadRecent = useCallback(async () => {
+        if (!selectedProject?.id) {
+            setRecentAssets([]);
+            return;
+        }
+        try {
+            const assets = await api.getRecentAssets(selectedProject?.id);
+            setRecentAssets(assets);
+        } catch (e) {
+            console.error(e);
+            statusBus.emit('Failed to connect to backend for recent assets.');
+        }
     }, [selectedProject]);
+
+    useEffect(() => {
+        loadRecent();
+    }, [loadRecent]);
+
+    const handleImported = (_assetId: string) => {
+        // Refresh asset list when a new file is imported
+        loadRecent();
+        statusBus.emit('Asset imported successfully!');
+    };
 
     const handleSearch = (query: string) => {
         navigate(`/search?q=${encodeURIComponent(query)}`);
@@ -51,6 +58,13 @@ const Home: React.FC = () => {
                     What are you looking for?
                 </h1>
                 <SearchBar onSearch={handleSearch} autoFocus />
+                {/* Import Button */}
+                <div className="mt-4 flex justify-center">
+                    <ImportButton
+                        projectId={selectedProject?.id || ''}
+                        onImported={handleImported}
+                    />
+                </div>
             </div>
 
             {/* Recommended/Recent Area */}

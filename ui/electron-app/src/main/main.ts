@@ -1,14 +1,14 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { spawn, ChildProcess } from 'child_process';
 import * as os from 'os';
 
 const logFile = path.join(app.getPath('userData'), 'error.log');
-fs.writeFileSync(logFile, 'Electron Started\\n');
+fs.writeFileSync(logFile, 'Electron Started\n');
 
 process.on('uncaughtException', (err) => {
-    fs.appendFileSync(logFile, err.stack + '\\n');
+    fs.appendFileSync(logFile, err.stack + '\n');
     app.quit();
 });
 
@@ -44,8 +44,8 @@ function stopBackend() {
 
 function createWindow() {
     const win = new BrowserWindow({
-        width: 1200,
-        height: 800,
+        width: 1280,
+        height: 840,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -54,11 +54,27 @@ function createWindow() {
         backgroundColor: '#0f172a'
     });
 
+    // Register IPC handler for native file dialog
+    ipcMain.handle('select-file', async (_event, options?: Electron.OpenDialogOptions) => {
+        const result = await dialog.showOpenDialog(win, {
+            title: 'Select 3D Asset',
+            filters: [
+                { name: '3D Assets', extensions: ['obj', 'glb', 'gltf', 'fbx', 'blend'] },
+                { name: 'OBJ Files', extensions: ['obj'] },
+                { name: 'GLTF / GLB', extensions: ['gltf', 'glb'] },
+                { name: 'All Files', extensions: ['*'] }
+            ],
+            properties: ['openFile'],
+            ...options
+        });
+        if (result.canceled || result.filePaths.length === 0) return null;
+        return result.filePaths[0];
+    });
+
     if (isDev) {
         win.loadURL('http://127.0.0.1:5173');
         // win.webContents.openDevTools({ mode: 'detach' });
     } else {
-        // Vite builds to dist/ renderer is expected there (need to adjust build step if different)
         win.loadFile(path.join(__dirname, '../index.html'));
     }
 }

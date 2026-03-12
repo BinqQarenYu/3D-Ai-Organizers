@@ -403,3 +403,64 @@ async def get_preview_image(asset_id: str):
             
     # Instead of sending a real file, just 404 or send transparent 1x1 for now so frontend handles onError
     raise HTTPException(status_code=404, detail="Preview not generated yet")
+
+
+# --- File Upload ---
+
+ALLOWED_UPLOAD_EXTENSIONS = {".obj", ".glb", ".gltf", ".fbx", ".blend", ".png", ".jpg", ".jpeg"}
+
+@app.post("/api/v1/files/upload", response_model=schemas.AssetCreateResponse)
+async def upload_file(
+    project_id: str = Form(...),
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    await check_project_access(project_id, current_user)
+
+    original_filename = file.filename or "unknown"
+    ext = os.path.splitext(original_filename)[1].lower()
+
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}. Allowed: {', '.join(ALLOWED_UPLOAD_EXTENSIONS)}")
+
+    # Create unique asset ID + storage key
+    asset_id = str(uuid.uuid4()).replace("-", "")
+    storage_key = f"originals/{asset_id}{ext}"
+    dest_ref = storage_provider.ref(storage_key)
+
+    # Save uploaded bytes to originals/
+    orig_dir = Path(settings.assets_root) / "originals"
+    orig_dir.mkdir(parents=True, exist_ok=True)
+    dest_path = Path(settings.assets_root) / storage_key
+
+    with open(dest_path, "wb") as out:
+        shutil.copyfileobj(file.file, out)
+
+    logger.info(f"Uploaded file saved to: {dest_path}")
+
+    # Create and save asset record
+    record = create_initial_record(
+        asset_id=asset_id,
+        original_filename=storage_key,
+        project_id=project_id,
+        owner_id=current_user.get("id")
+    )
+    record["identity"]["display_name"] = os.path.splitext(original_filename)[0]
+
+    # Extract 3D metadata synchronously
+    try:
+        meta3d, metabim = extract_3d_metadata(str(dest_path))
+        if meta3d or metabim:
+            if "vision" not in record:
+                record["vision"] = {}
+            if meta3d:
+                record["vision"]["metadata_3d"] = meta3d
+            if metabim:
+                record["vision"]["metadata_bim"] = metabim
+    except Exception as e:
+        logger.warning(f"3D metadata extraction failed for {original_filename}: {e}")
+
+    record["status"]["state"] = "indexed"
+    save_asset_metadata(storage_provider, asset_id, record)
+
+    return schemas.AssetCreateResponse(data=schemas.AssetCreateData(asset_id=asset_id))
