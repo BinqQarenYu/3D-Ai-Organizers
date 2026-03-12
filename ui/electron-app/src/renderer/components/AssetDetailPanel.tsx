@@ -6,7 +6,7 @@ import { X, ExternalLink, Search, Copy, Box, Image } from 'lucide-react';
 import Stage3D from './viewer/Stage3D';
 
 const API_BASE = 'http://127.0.0.1:17831';
-const VIEWABLE_3D_EXTS = new Set(['.obj', '.glb', '.gltf']);
+const VIEWABLE_3D_EXTS = new Set(['.obj', '.glb', '.gltf', '.fbx']);
 
 interface AssetDetailPanelProps {
     assetId: string | null;

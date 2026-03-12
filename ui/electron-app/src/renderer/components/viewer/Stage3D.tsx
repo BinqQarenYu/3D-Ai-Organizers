@@ -2,6 +2,7 @@ import React, { Suspense, useMemo } from 'react';
 import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls, Environment, Center, Html, useGLTF } from '@react-three/drei';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { Group } from 'three';
 
 interface Stage3DProps {
@@ -22,6 +23,12 @@ const ModelLoader: React.FC<{ url: string, ext: string }> = ({ url, ext }) => {
     if (extension === '.obj') {
         const obj = useLoader(OBJLoader, url) as Group;
         return <primitive object={obj} />;
+    }
+
+    // For FBX
+    if (extension === '.fbx') {
+        const fbx = useLoader(FBXLoader, url) as Group;
+        return <primitive object={fbx} />;
     }
 
     // Fallback or unsupported
