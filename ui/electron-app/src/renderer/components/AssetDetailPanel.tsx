@@ -9,7 +9,7 @@ const API_BASE = 'http://127.0.0.1:17831';
 const VIEWABLE_3D_EXTS = new Set([
     '.obj', '.glb', '.gltf', '.fbx', '.stl', 
     '.ply', '.dae', '.3mf', '.3dm', 
-    '.skp', '.rvt', '.max', '.ifc', '.blend'
+    '.skp', '.rvt', '.rft', '.max', '.ifc', '.blend'
 ]);
 
 interface AssetDetailPanelProps {
