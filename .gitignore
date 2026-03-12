@@ -6,3 +6,8 @@ backend/__pycache__/
 *.sqlite
 .DS_Store
 __pycache__/
+assets_root/
+.pyre/
+.pytype/
+.mypy_cache/
+.pytest_cache/
