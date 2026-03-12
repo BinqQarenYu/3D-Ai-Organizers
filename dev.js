@@ -1,4 +1,5 @@
 const { spawn, execSync } = require('child_process');
+delete process.env.ELECTRON_RUN_AS_NODE;
 
 console.log("Starting AI Asset Memory Environment...");
 
