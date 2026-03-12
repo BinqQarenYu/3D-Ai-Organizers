@@ -430,7 +430,12 @@ async def get_preview_image(asset_id: str):
 
 # --- File Upload ---
 
-ALLOWED_UPLOAD_EXTENSIONS = {".obj", ".glb", ".gltf", ".fbx", ".blend", ".png", ".jpg", ".jpeg"}
+ALLOWED_UPLOAD_EXTENSIONS = {
+    ".obj", ".glb", ".gltf", ".fbx", ".blend", 
+    ".skp", ".max", ".rvt", ".stl", ".ply", 
+    ".dae", ".3mf", ".3dm", ".ifc",
+    ".png", ".jpg", ".jpeg"
+}
 
 @app.post("/api/v1/files/upload", response_model=schemas.AssetCreateResponse)
 async def upload_file(

@@ -1,9 +1,11 @@
 import React, { Suspense, useMemo } from 'react';
+import { Box } from 'lucide-react';
 import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls, Environment, Center, Html, useGLTF } from '@react-three/drei';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
-import { Group } from 'three';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import { Group, Mesh, MeshStandardMaterial } from 'three';
 
 interface Stage3DProps {
     sourceUrl: string;
@@ -31,8 +33,28 @@ const ModelLoader: React.FC<{ url: string, ext: string }> = ({ url, ext }) => {
         return <primitive object={fbx} />;
     }
 
-    // Fallback or unsupported
-    return null;
+    // For STL
+    if (extension === '.stl') {
+        const geometry = useLoader(STLLoader, url);
+        const material = useMemo(() => new MeshStandardMaterial({ color: 0x888888, metalness: 0.1, roughness: 0.5 }), []);
+        return <mesh geometry={geometry} material={material} />;
+    }
+
+    // Fallback message for proprietary formats
+    return (
+        <Html center>
+            <div className="flex flex-col items-center justify-center p-6 bg-slate-900/90 backdrop-blur-lg rounded-2xl text-white shadow-2xl border border-white/10 max-w-[280px] text-center">
+                <div className="w-12 h-12 bg-indigo-500/20 rounded-full flex items-center justify-center mb-4">
+                    <Box size={24} className="text-indigo-400" />
+                </div>
+                <h3 className="text-sm font-bold mb-1 italic">Proprietary Format</h3>
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                    Format {extension.toUpperCase()} is indexed but cannot be viewed directly in-browser. <br/>
+                    <span className="text-indigo-400 font-semibold mt-2 block">Use "Open File" to view in native app.</span>
+                </p>
+            </div>
+        </Html>
+    );
 };
 
 const LoadingOverlay: React.FC = () => {
