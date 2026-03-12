@@ -4,12 +4,19 @@ const API_BASE_URL = 'http://127.0.0.1:17831/api/v1';
 
 class ApiClient {
     private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+        const token = localStorage.getItem('token');
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            ...options?.headers as Record<string, string>,
+        };
+
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
         const response = await fetch(`${API_BASE_URL}${endpoint}`, {
             ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                ...options?.headers,
-            },
+            headers,
         });
 
         if (!response.ok) {
@@ -23,21 +30,28 @@ class ApiClient {
         return `${API_BASE_URL}/files/preview/${assetId}`;
     }
 
-    async searchAssets(query: string, offset: number = 0, limit: number = 50): Promise<SearchResponse> {
-        return this.request<SearchResponse>('/search', {
+    async searchAssets(query: string, projectId?: string, offset: number = 0, limit: number = 50): Promise<SearchResponse> {
+        let endpoint = '/search';
+        if (projectId) endpoint += `?project_id=${projectId}`;
+
+        return this.request<SearchResponse>(endpoint, {
             method: 'POST',
             body: JSON.stringify({ query, offset, limit })
         });
     }
 
-    async getRecentAssets(): Promise<AssetListItem[]> {
-        // Assuming backend returns a list of recent assets here. We might reuse search with empty query and sort=recent
-        const res = await this.request<{ items: AssetListItem[] }>('/assets?sort=recent&limit=12');
-        return res.items;
+    async getRecentAssets(projectId?: string): Promise<AssetListItem[]> {
+        let endpoint = '/assets?sort=recent&limit=12';
+        if (projectId) endpoint += `&project_id=${projectId}`;
+
+        // Ensure proper unwrapping of data depending on backend schema
+        const res = await this.request<any>(endpoint);
+        return res.data?.items || [];
     }
 
-    async getAssetDetails(assetId: string): Promise<AssetDetail> {
-        return this.request<AssetDetail>(`/assets/${assetId}`);
+    async getAssetDetails(assetId: string): Promise<any> {
+        const res = await this.request<any>(`/assets/${assetId}`);
+        return res.data;
     }
 
     async openOriginal(assetId: string): Promise<void> {
@@ -47,12 +61,29 @@ class ApiClient {
         });
     }
 
-    async findSimilar(assetId: string, topK: number = 24, threshold: number = 0.75): Promise<SimilarResultItem[]> {
-        const res = await this.request<{ items: SimilarResultItem[] }>('/vision/similar', {
+    async findSimilar(assetId: string, projectId: string, topK: number = 24, threshold: number = 0.75): Promise<SimilarResultItem[]> {
+        const formData = new URLSearchParams();
+        formData.append('mode', 'by_asset');
+        formData.append('project_id', projectId);
+        formData.append('asset_id', assetId);
+        formData.append('top_k', topK.toString());
+        formData.append('threshold', threshold.toString());
+
+        const token = localStorage.getItem('token');
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`${API_BASE_URL}/vision/similar`, {
             method: 'POST',
-            body: JSON.stringify({ mode: 'by_asset', asset_id: assetId, top_k: topK, threshold })
+            headers,
+            body: formData.toString()
         });
-        return res.items;
+
+        if (!res.ok) throw new Error('API Error');
+        const data = await res.json();
+        return data.data?.results || [];
     }
 }
 

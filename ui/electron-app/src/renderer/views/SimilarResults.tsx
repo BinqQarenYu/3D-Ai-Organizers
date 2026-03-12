@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useProject } from '../contexts/ProjectContext';
 import { ArrowLeft } from 'lucide-react';
 import AssetGrid from '../components/AssetGrid';
 import AssetDetailPanel from '../components/AssetDetailPanel';
@@ -9,6 +10,9 @@ import { statusBus } from '../components/StatusBar';
 
 const SimilarResults: React.FC = () => {
     const { assetId } = useParams<{ assetId: string }>();
+    const [searchParams] = useSearchParams();
+    const projectId = searchParams.get('projectId');
+    const { selectedProject } = useProject();
     const navigate = useNavigate();
 
     const [sourceAsset, setSourceAsset] = useState<AssetDetail | null>(null);

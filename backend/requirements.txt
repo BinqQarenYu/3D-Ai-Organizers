@@ -8,4 +8,10 @@ trimesh
 httpx
 ifcopenshell
 ezdxf
+motor
+pyjwt
+passlib[bcrypt]
+bcrypt
+python-multipart
+pydantic[email]
 olefile

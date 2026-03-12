@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-asset-memory-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ai-asset-memory-backend
+  template:
+    metadata:
+      labels:
+        app: ai-asset-memory-backend
+    spec:
+      containers:
+      - name: backend
+        image: ai-asset-memory-backend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 17831
+        env:
+        - name: MONGO_URL
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: mongo_url
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: secret_key
+        volumeMounts:
+        - name: assets-volume
+          mountPath: /app/assets_root
+      volumes:
+      - name: assets-volume
+        persistentVolumeClaim:
+          claimName: assets-pvc

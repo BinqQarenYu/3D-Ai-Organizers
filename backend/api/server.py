@@ -17,6 +17,17 @@ from backend.watcher.watch_service import WatchService
 import uuid
 from backend.indexer.asset_record import load_asset_metadata, create_initial_record, save_asset_metadata
 from backend.api import schemas
+from backend.api.auth import get_current_user
+from fastapi import Depends
+from backend.api.database import get_db
+from bson import ObjectId
+
+
+
+from .database import init_db
+from .routes import auth, projects
+from fastapi import Request
+
 from backend.api.extract_3d import extract_3d_metadata
 from backend.api.proxy import router as proxy_router
 
@@ -24,6 +35,11 @@ app = FastAPI(title="AI Asset Memory Backend", version="0.1.0")
 
 # Include Proxy router
 app.include_router(proxy_router)
+
+# Include Auth & Project routers
+app.include_router(auth.router)
+app.include_router(projects.router)
+
 
 # Allow all CORS for desktop Electron app
 app.add_middleware(
@@ -39,8 +55,16 @@ embedding_store: EmbeddingStore
 similarity_service: SimilarityService
 watch_service: WatchService
 
+
 @app.on_event("startup")
 async def startup_event():
+    from .database import init_db
+    try:
+        await init_db()
+        logger.info("MongoDB connection initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize MongoDB: {e}")
+
     global storage_provider, embedding_store, similarity_service
     
     logger.info("Initializing Backend Services...")
@@ -106,11 +130,15 @@ async def get_settings():
 @app.post("/api/v1/vision/similar", response_model=schemas.SimilarResponse)
 async def find_similar(
     mode: str = Form(...),
+    project_id: str = Form(...),
     asset_id: Optional[str] = Form(None),
     top_k: int = Form(24),
     threshold: float = Form(0.70),
-    file: Optional[UploadFile] = File(None)
+    file: Optional[UploadFile] = File(None),
+    current_user: dict = Depends(get_current_user)
 ):
+    await check_project_access(project_id, current_user)
+
     if mode not in ("by_asset", "by_image"):
         raise HTTPException(status_code=400, detail="Invalid mode, must be by_asset or by_image")
 
@@ -122,8 +150,13 @@ async def find_similar(
             raise HTTPException(status_code=400, detail="asset_id is required for by_asset mode")
         query_info.asset_id = asset_id
         
-        sims = similarity_service.similar_by_asset(asset_id, top_k, threshold)
+        sims = similarity_service.similar_by_asset(asset_id, top_k * 5, threshold) # fetch more to filter
         for s in sims:
+            record = load_asset_metadata(storage_provider, s.asset_id)
+            if not record or record.get("project_id") != project_id:
+                continue
+            if len(results) >= top_k:
+                break
             results.append(schemas.SimilarResultItem(
                 asset_id=s.asset_id,
                 similarity=s.similarity,
@@ -140,8 +173,13 @@ async def find_similar(
             temp_path = tf.name
             
         try:
-            sims = similarity_service.similar_by_image_path(temp_path, top_k, threshold)
+            sims = similarity_service.similar_by_image_path(temp_path, top_k * 5, threshold)
             for s in sims:
+                record = load_asset_metadata(storage_provider, s.asset_id)
+                if not record or record.get("project_id") != project_id:
+                    continue
+                if len(results) >= top_k:
+                    break
                 results.append(schemas.SimilarResultItem(
                     asset_id=s.asset_id,
                     similarity=s.similarity,
@@ -157,7 +195,25 @@ async def find_similar(
 
 # --- API Implementations ---
 
-def _load_all_records():
+
+from bson.errors import InvalidId
+
+async def check_project_access(project_id: str, current_user: dict):
+    if not project_id:
+        raise HTTPException(status_code=400, detail="project_id is required")
+    db = get_db()
+    try:
+        project = await db.projects.find_one({"_id": ObjectId(project_id)})
+    except InvalidId:
+        raise HTTPException(status_code=400, detail="Invalid project_id format")
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if current_user["id"] != project["owner_id"] and current_user["id"] not in project.get("members", []):
+        raise HTTPException(status_code=403, detail="Not authorized to access this project")
+    return True
+
+def _load_all_records(project_id: str = None):
     assets_ref = storage_provider.ref("assets")
     records = []
     if storage_provider.exists(assets_ref):
@@ -166,13 +222,17 @@ def _load_all_records():
                 asset_id = item.name[:-5]
                 data = load_asset_metadata(storage_provider, asset_id)
                 if data:
+                    # Filter by project_id
+                    if project_id and data.get("project_id") != project_id:
+                        continue
                     records.append(data)
     # Sort descending by creation date (newest first)
     records.sort(key=lambda x: x.get("timestamps", {}).get("created_at", ""), reverse=True)
     return records
 
 @app.post("/api/v1/assets", response_model=schemas.AssetCreateResponse)
-async def create_asset(req: schemas.AssetCreateRequest):
+async def create_asset(req: schemas.AssetCreateRequest, project_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    await check_project_access(project_id, current_user)
     asset_id = str(uuid.uuid4()).replace("-", "")
 
     # Generate a sensible name if none provided
@@ -180,7 +240,7 @@ async def create_asset(req: schemas.AssetCreateRequest):
     if not name:
         name = req.reference_url.split("/")[-1]
 
-    record = create_initial_record(asset_id, name)
+    record = create_initial_record(asset_id, name, project_id=project_id, owner_id=current_user.get('id'))
 
     # Store reference url instead of local original file
     record["files"]["original_filename"] = req.reference_url
@@ -200,8 +260,9 @@ async def create_asset(req: schemas.AssetCreateRequest):
     return schemas.AssetCreateResponse(data=schemas.AssetCreateData(asset_id=asset_id))
 
 @app.post("/api/v1/search", response_model=schemas.SearchResponse)
-async def search_assets(req: schemas.SearchRequest):
-    all_records = _load_all_records()
+async def search_assets(req: schemas.SearchRequest, project_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    await check_project_access(project_id, current_user)
+    all_records = _load_all_records(project_id=project_id)
     items = []
     
     query = (req.query or "").lower().strip()
@@ -233,8 +294,9 @@ async def search_assets(req: schemas.SearchRequest):
     return schemas.SearchResponse(data=data)
 
 @app.get("/api/v1/assets", response_model=schemas.AssetListResponse)
-async def list_recent_assets():
-    all_records = _load_all_records()
+async def list_recent_assets(project_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    await check_project_access(project_id, current_user)
+    all_records = _load_all_records(project_id=project_id)
     
     items = []
     # Take top 12
@@ -251,8 +313,10 @@ async def list_recent_assets():
     return schemas.AssetListResponse(data=data)
 
 @app.get("/api/v1/assets/{asset_id}", response_model=schemas.AssetDetailsResponse)
-async def get_asset_details(asset_id: str):
+async def get_asset_details(asset_id: str, current_user: dict = Depends(get_current_user)):
     record = load_asset_metadata(storage_provider, asset_id)
+    if record and record.get("project_id"):
+        await check_project_access(record.get("project_id"), current_user)
     if not record:
         raise HTTPException(status_code=404, detail="Asset not found")
         

@@ -26,12 +26,14 @@ def save_asset_metadata(provider: StorageProvider, asset_id: str, data: Dict[str
     raw_bytes = json.dumps(data, indent=2).encode('utf-8')
     provider.put_bytes(ref, raw_bytes, overwrite=True)
 
-def create_initial_record(asset_id: str, original_filename: str) -> Dict[str, Any]:
+def create_initial_record(asset_id: str, original_filename: str, project_id: str = None, owner_id: str = None) -> Dict[str, Any]:
     """Scaffolds a new empty record."""
     from datetime import datetime
     now = datetime.utcnow().isoformat()
     return {
         "asset_id": asset_id,
+        "project_id": project_id,
+        "owner_id": owner_id,
         "identity": {
             "display_name": original_filename.split('.')[0],
             "name_source": "filename",
